@@ -1,6 +1,95 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    ":dependencyDashboard",
+    "group:monorepos",
+    "schedule:weekly"
+  ],
+  "platformAutomerge": true,
+  "prConcurrentLimit": 4,
+  "prHourlyLimit": 2,
+  "timezone": "Europe/Berlin",
+  "labels": [
+    "dependencies",
+    "renovate"
+  ],
+  "assignees": [
+    "mkass"
+  ],
+  "reviewers": [
+    "mkass"
+  ],
+  "dependencyDashboard": true,
+  "maven": {
+    "registryUrls": [
+      "https://repo.maven.apache.org/maven2"
+    ]
+  },
+  "packageRules": [
+    {
+      "matchPackageNames": [
+        "org.postgresql:postgresql"
+      ],
+      "enabled": false
+    },
+    {
+      "matchPackagePatterns": [
+        "^org\\.springframework\\.boot"
+      ],
+      "groupName": "Spring Boot",
+      "semanticCommitType": "fix"
+    },
+    {
+      "matchPackagePatterns": [
+        "^org\\.springdoc"
+      ],
+      "groupName": "SpringDoc OpenAPI"
+    },
+    {
+      "matchPackagePatterns": [
+        "^software\\.amazon\\.awssdk",
+        "^io\\.awspring\\.cloud"
+      ],
+      "groupName": "AWS SDK"
+    },
+    {
+      "matchPackagePatterns": [
+        "^com\\.bucket4j"
+      ],
+      "groupName": "Bucket4j"
+    },
+    {
+      "matchPackagePatterns": [
+        "^org\\.testcontainers"
+      ],
+      "groupName": "Testcontainers",
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "schedule": [
+        "on friday after 07:00"
+      ]
+    },
+    {
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "matchDepTypes": [
+        "test"
+      ],
+      "automerge": true,
+      "automergeType": "pr"
+    }
   ]
 }

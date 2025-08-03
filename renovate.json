@@ -15,10 +15,10 @@
     "renovate"
   ],
   "assignees": [
-    "mkass"
+    "knmaher"
   ],
   "reviewers": [
-    "mkass"
+    "knmaher"
   ],
   "dependencyDashboard": true,
   "maven": {

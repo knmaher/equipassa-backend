@@ -4,18 +4,25 @@ import com.equipassa.equipassa.dto.UserRequest;
 import com.equipassa.equipassa.dto.UserResponse;
 import com.equipassa.equipassa.security.dto.*;
 import com.equipassa.equipassa.security.service.AuthService;
+import com.equipassa.equipassa.util.CookieUtils;
+import com.equipassa.equipassa.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.Duration;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
     private final AuthService authService;
+    private final JwtUtil jwtUtil;
 
-    public AuthController(final AuthService authService) {
+    public AuthController(final AuthService authService, final JwtUtil jwtUtil) {
         this.authService = authService;
+        this.jwtUtil = jwtUtil;
     }
 
     @PostMapping("/register-org")
@@ -33,16 +40,47 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody @Valid final LoginRequest request, final HttpServletRequest httpRequest) {
-        final String clientIp = getClientIp(httpRequest);
-        return ResponseEntity.ok(authService.login(request, clientIp));
+    public ResponseEntity<AuthResponse> login(
+            @RequestBody @Valid final LoginRequest request,
+            final HttpServletRequest httpRequest,
+            final HttpServletResponse httpResponse
+    ) {
+        final AuthResponse tokens = authService.login(request, getClientIp(httpRequest));
+        CookieUtils.addHttpOnlyCookie(
+                httpResponse, "accessToken",
+                tokens.token(),
+                Duration.ofMillis(jwtUtil.getExpirationTime()),
+                "/", true, "None"
+        );
+
+        CookieUtils.addHttpOnlyCookie(
+                httpResponse, "refreshToken",
+                tokens.refreshToken(),
+                Duration.ofDays(7),
+                "/api/auth/refresh", true, "None"
+        );
+
+        return ResponseEntity.ok(tokens);
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestHeader("Authorization") final String authHeader) {
-        final String token = authHeader.substring(7);
-        authService.logout(token);
-        return ResponseEntity.noContent().build();
+    public void logout(
+            @CookieValue(value = "accessToken", required = false) final String cookieToken,
+            @RequestHeader(value = "Authorization", required = false) final String headerToken,
+            final HttpServletResponse response
+    ) {
+        String token = cookieToken;
+        if (token == null && headerToken != null && headerToken.startsWith("Bearer ")) {
+            token = headerToken.substring(7);
+        }
+
+        if (token != null) {
+            authService.logout(token);
+        }
+
+        CookieUtils.clearCookie(response, "accessToken", "/");
+        CookieUtils.clearCookie(response, "refreshToken", "/");
+        response.setStatus(HttpServletResponse.SC_NO_CONTENT);
     }
 
     @GetMapping("/verify-email")
@@ -52,11 +90,22 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<AuthResponse> refreshToken(
-            @RequestBody @Valid final RefreshTokenRequest request
+    public void refreshToken(
+            @CookieValue("refreshToken") final String refreshTokenCookie,
+            final HttpServletResponse response
     ) {
-        final AuthResponse response = authService.refreshToken(request.refreshToken());
-        return ResponseEntity.ok(response);
+        final AuthResponse tokens = authService.refreshToken(refreshTokenCookie);
+        CookieUtils.addHttpOnlyCookie(
+                response, "accessToken", tokens.token(),
+                Duration.ofMillis(jwtUtil.getExpirationTime()),
+                "/", true, "Lax"
+        );
+        CookieUtils.addHttpOnlyCookie(
+                response, "refreshToken", tokens.refreshToken(),
+                Duration.ofDays(7),
+                "/api/auth/refresh", true, "Strict"
+        );
+        response.setStatus(HttpServletResponse.SC_NO_CONTENT);
     }
 
     @PostMapping("/password-reset/request")

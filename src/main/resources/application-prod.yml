@@ -36,15 +36,6 @@ spring:
     baseline-on-migrate: true
     validate-on-migrate: true
 
-  # REMOVE default Boot user; you handle auth yourself.
-  security:
-    user: { }            # keep empty (or delete the whole block)
-    oauth2:
-      client:
-        registration: { }
-    filter:
-      order: 0
-
   mail:
     host: ${MAIL_HOST}
     port: ${MAIL_PORT:587}

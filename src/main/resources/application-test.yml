@@ -84,7 +84,7 @@ equipassa:
 
 security:
   remember-me:
-    key: ${REMEMBER_ME_KEY:local-remember-me}
+    enabled: false
 kube:
   probe:
     token: ${KUBE_PROBE_TOKEN:dev-probe-token}

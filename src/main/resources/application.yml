@@ -32,15 +32,6 @@ spring:
     baseline-on-migrate: true
     validate-on-migrate: true
 
-  security:
-    user:
-      name: admin
-      password: securepassword
-    oauth2:
-      client:
-        registration: { }
-    filter:
-      order: 0
   mail:
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}
@@ -110,3 +101,7 @@ equipassa:
   email:
     from-address: "no-replay@equipassa.com"
   server: ${EQUIPASSA_SERVER:http://localhost:8081}
+
+security:
+  remember-me:
+    enabled: false

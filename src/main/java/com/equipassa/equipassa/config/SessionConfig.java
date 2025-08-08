@@ -27,8 +27,20 @@ public class SessionConfig {
         s.setCookieName("EQUIPASSA_SESSION");
         s.setCookiePath("/");
         s.setUseHttpOnlyCookie(true);
-        s.setUseSecureCookie(env.acceptsProfiles("prod")); // Secure only on HTTPS
-        s.setSameSite("None"); // cross-site (frontend on another origin)
+
+        final boolean prod = env.acceptsProfiles("prod");
+
+        if (prod) {
+            // Real cross-site SPA in prod behind HTTPS
+            s.setSameSite("None");
+            s.setUseSecureCookie(true);
+        } else {
+            // Dev: **strongly** recommend a Vite dev proxy so API is same-origin
+            // Then Lax works fine on HTTP.
+            s.setSameSite("Lax");
+            s.setUseSecureCookie(false);
+        }
+
         return s;
     }
 

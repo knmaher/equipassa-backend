@@ -10,12 +10,16 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -25,62 +29,58 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@Order(2) // after Actuator chain
+@Order(2)
 public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(final HttpSecurity http) throws Exception {
+        final var csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        csrfRepo.setCookiePath("/");
+        csrfRepo.setCookieName("XSRF-TOKEN");      // default; explicit for clarity
+        csrfRepo.setHeaderName("X-XSRF-TOKEN");    // matches your frontend
+
+        final var requestHandler = new CsrfTokenRequestAttributeHandler(); // <-- accept raw header token
+
         http
-                // CSRF for SPA with cookie token; we only ignore kube probes.
                 .csrf(csrf -> csrf
-                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                        .csrfTokenRepository(csrfRepo)
+                        .csrfTokenRequestHandler(requestHandler)            // <-- IMPORTANT
                         .ignoringRequestMatchers("/kube/**")
                 )
-
-                // Server sessions
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
-                )
-
+                .requestCache(AbstractHttpConfigurer::disable)
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth
-                        // Kube probes
-                        .requestMatchers("/kube/liveness", "/kube/readiness").permitAll()
-
-                        // API docs
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-
-                        // Auth endpoints: allow login & registration; /logout requires CSRF & session
-                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/register-org").permitAll()
-
-                        // everything else requires auth
+                        .requestMatchers(
+                                "/kube/liveness", "/kube/readiness",
+                                "/swagger-ui/**", "/swagger-ui.html",
+                                "/v3/api-docs/**", "/v3/api-doc/**",
+                                "/api/auth/csrf",
+                                "/api/auth/login",
+                                "/api/auth/register",
+                                "/api/auth/register-org"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
-
-                // JSON 401/403
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new RestAuthenticationEntryPoint())
                         .accessDeniedHandler(new RestAccessDeniedHandler())
                 )
-
-                // CORS
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // Security headers
-                .headers(headers -> headers
-                        .contentSecurityPolicy(csp -> csp
-                                .policyDirectives("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'")
-                        )
-                        .httpStrictTransportSecurity(hsts -> hsts
-                                .includeSubDomains(true)
-                                .preload(true)
-                                .maxAgeInSeconds(31536000)
-                        )
+                .cors(c -> c.configurationSource(corsConfigurationSource()))
+                .headers(h -> h
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'"))
+                        .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).preload(true).maxAgeInSeconds(31536000))
                         .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)
                 );
 
-        // No JWT filter, no remember-me here
-
         return http.build();
+    }
+
+    @Bean
+    public SecurityContextRepository securityContextRepository() {
+        final HttpSessionSecurityContextRepository repo = new HttpSessionSecurityContextRepository();
+        repo.setAllowSessionCreation(true);
+        return repo;
     }
 
     @Bean

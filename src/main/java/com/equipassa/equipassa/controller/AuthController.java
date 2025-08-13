@@ -6,6 +6,7 @@ import com.equipassa.equipassa.security.CustomUserDetails;
 import com.equipassa.equipassa.security.dto.*;
 import com.equipassa.equipassa.security.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -13,7 +14,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,11 +23,13 @@ public class AuthController {
 
     private final AuthService authService;
     private final AuthenticationManager authenticationManager;
+    private final SecurityContextRepository contextRepository;
 
     public AuthController(final AuthService authService,
-                          final AuthenticationManager authenticationManager) {
+                          final AuthenticationManager authenticationManager, final SecurityContextRepository contextRepository) {
         this.authService = authService;
         this.authenticationManager = authenticationManager;
+        this.contextRepository = contextRepository;
     }
 
     @PostMapping("/register-org")
@@ -46,21 +49,23 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(
             @RequestBody @Valid final LoginRequest request,
-            final HttpServletRequest httpRequest
+            final HttpServletRequest httpRequest,
+            final HttpServletResponse httpResponse
     ) {
         final String clientIp = getClientIp(httpRequest);
 
-        // authenticate
+        httpRequest.getSession(true);
+        httpRequest.changeSessionId();
+
         final Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.email(), request.password())
         );
 
-        // set security context & rotate session id (fixation protection)
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        httpRequest.changeSessionId();
-        final HttpSession session = httpRequest.getSession(true);
-        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                SecurityContextHolder.getContext());
+        final var context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(authentication);
+        SecurityContextHolder.setContext(context);
+
+        contextRepository.saveContext(context, httpRequest, httpResponse);
 
         // optional: audit
         authService.auditLoginSuccess(request.email(), clientIp);

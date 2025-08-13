@@ -1,9 +1,14 @@
 package com.equipassa.equipassa.config;
 
+import org.springframework.boot.convert.ApplicationConversionService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
-import org.springframework.format.support.DefaultFormattingConversionService;
+import org.springframework.core.serializer.support.DeserializingConverter;
+import org.springframework.core.serializer.support.SerializingConverter;
+import org.springframework.format.support.FormattingConversionService;
+import org.springframework.session.config.SessionRepositoryCustomizer;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.session.jdbc.config.annotation.web.http.EnableJdbcHttpSession;
 import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.session.web.http.DefaultCookieSerializer;
@@ -31,12 +36,9 @@ public class SessionConfig {
         final boolean prod = env.acceptsProfiles("prod");
 
         if (prod) {
-            // Real cross-site SPA in prod behind HTTPS
             s.setSameSite("None");
             s.setUseSecureCookie(true);
         } else {
-            // Dev: **strongly** recommend a Vite dev proxy so API is same-origin
-            // Then Lax works fine on HTTP.
             s.setSameSite("Lax");
             s.setUseSecureCookie(false);
         }
@@ -45,12 +47,28 @@ public class SessionConfig {
     }
 
     @Bean
-    public DefaultFormattingConversionService conversionService() {
-        final DefaultFormattingConversionService cs = new DefaultFormattingConversionService();
+    public FormattingConversionService conversionService() {
+        final ApplicationConversionService cs = new ApplicationConversionService();
+
+        // deine Zusatz-Konverter (nicht zwingend, aber ok)
         cs.addConverter(String.class, Instant.class, Instant::parse);
         cs.addConverter(Instant.class, String.class, Instant::toString);
         cs.addConverter(String.class, UUID.class, UUID::fromString);
         cs.addConverter(UUID.class, String.class, UUID::toString);
+
+        // WICHTIG: für Session-Attribute (SecurityContext) – Object <-> byte[]
+        final SerializingConverter ser = new SerializingConverter();
+        final DeserializingConverter deser = new DeserializingConverter();
+
+        cs.addConverter(ser);
+        cs.addConverter(deser);
+
         return cs;
+    }
+
+    @Bean
+    public SessionRepositoryCustomizer<JdbcIndexedSessionRepository> jdbcCustomizer(
+            final FormattingConversionService conversionService) {
+        return (repo) -> repo.setConversionService(conversionService);
     }
 }

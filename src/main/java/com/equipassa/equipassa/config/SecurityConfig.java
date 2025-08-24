@@ -36,15 +36,15 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(final HttpSecurity http) throws Exception {
         final var csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfRepo.setCookiePath("/");
-        csrfRepo.setCookieName("XSRF-TOKEN");      // default; explicit for clarity
-        csrfRepo.setHeaderName("X-XSRF-TOKEN");    // matches your frontend
+        csrfRepo.setCookieName("XSRF-TOKEN");
+        csrfRepo.setHeaderName("X-XSRF-TOKEN");
 
-        final var requestHandler = new CsrfTokenRequestAttributeHandler(); // <-- accept raw header token
+        final var requestHandler = new CsrfTokenRequestAttributeHandler();
 
         http
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfRepo)
-                        .csrfTokenRequestHandler(requestHandler)            // <-- IMPORTANT
+                        .csrfTokenRequestHandler(requestHandler)
                         .ignoringRequestMatchers("/kube/**")
                 )
                 .requestCache(AbstractHttpConfigurer::disable)
@@ -57,7 +57,8 @@ public class SecurityConfig {
                                 "/api/auth/csrf",
                                 "/api/auth/login",
                                 "/api/auth/register",
-                                "/api/auth/register-org"
+                                "/api/auth/register-org",
+                                "/api/auth/verify-email"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

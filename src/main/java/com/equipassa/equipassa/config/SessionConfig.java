@@ -4,6 +4,7 @@ import org.springframework.boot.convert.ApplicationConversionService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.core.serializer.support.DeserializingConverter;
 import org.springframework.core.serializer.support.SerializingConverter;
 import org.springframework.format.support.FormattingConversionService;
@@ -33,7 +34,7 @@ public class SessionConfig {
         s.setCookiePath("/");
         s.setUseHttpOnlyCookie(true);
 
-        final boolean prod = env.acceptsProfiles("prod");
+        final boolean prod = env.acceptsProfiles(Profiles.of("prod"));
 
         if (prod) {
             s.setSameSite("None");
@@ -48,22 +49,20 @@ public class SessionConfig {
 
     @Bean
     public FormattingConversionService conversionService() {
-        final ApplicationConversionService cs = new ApplicationConversionService();
+        final ApplicationConversionService applicationConversionService = new ApplicationConversionService();
 
-        // deine Zusatz-Konverter (nicht zwingend, aber ok)
-        cs.addConverter(String.class, Instant.class, Instant::parse);
-        cs.addConverter(Instant.class, String.class, Instant::toString);
-        cs.addConverter(String.class, UUID.class, UUID::fromString);
-        cs.addConverter(UUID.class, String.class, UUID::toString);
+        applicationConversionService.addConverter(String.class, Instant.class, Instant::parse);
+        applicationConversionService.addConverter(Instant.class, String.class, Instant::toString);
+        applicationConversionService.addConverter(String.class, UUID.class, UUID::fromString);
+        applicationConversionService.addConverter(UUID.class, String.class, UUID::toString);
 
-        // WICHTIG: für Session-Attribute (SecurityContext) – Object <-> byte[]
-        final SerializingConverter ser = new SerializingConverter();
-        final DeserializingConverter deser = new DeserializingConverter();
+        final SerializingConverter serializingConverter = new SerializingConverter();
+        final DeserializingConverter deserializingConverter = new DeserializingConverter();
 
-        cs.addConverter(ser);
-        cs.addConverter(deser);
+        applicationConversionService.addConverter(serializingConverter);
+        applicationConversionService.addConverter(deserializingConverter);
 
-        return cs;
+        return applicationConversionService;
     }
 
     @Bean

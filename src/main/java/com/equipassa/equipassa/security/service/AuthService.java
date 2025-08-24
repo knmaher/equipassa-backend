@@ -15,7 +15,6 @@ import com.equipassa.equipassa.service.token.ActionTokenContext;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,9 +27,6 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
-    private final AuthenticationManager authenticationManager;
-    private final MfaService mfaService;
-    private final BackupCodeService backupCodeService;
     private final OrganizationRepository organizationRepository;
     private final ActionTokenContext actionTokenContext;
     private final ApplicationEventPublisher events;
@@ -40,9 +36,6 @@ public class AuthService {
             final UserRepository userRepository,
             final PasswordEncoder passwordEncoder,
             final AuditLogService auditLogService,
-            final AuthenticationManager authenticationManager,
-            final MfaService mfaService,
-            final BackupCodeService backupCodeService,
             final OrganizationRepository organizationRepository,
             final ActionTokenContext actionTokenContext,
             final ApplicationEventPublisher events,
@@ -51,9 +44,6 @@ public class AuthService {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditLogService = auditLogService;
-        this.authenticationManager = authenticationManager;
-        this.mfaService = mfaService;
-        this.backupCodeService = backupCodeService;
         this.organizationRepository = organizationRepository;
         this.actionTokenContext = actionTokenContext;
         this.events = events;

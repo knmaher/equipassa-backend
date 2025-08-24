@@ -67,17 +67,15 @@ public class AuthController {
 
         contextRepository.saveContext(context, httpRequest, httpResponse);
 
-        // optional: audit
         authService.auditLoginSuccess(request.email(), clientIp);
 
-        // build a lightweight response
         final CustomUserDetails u = (CustomUserDetails) authentication.getPrincipal();
         final AuthResponse body = new AuthResponse(
-                null,      // token (unused with sessions)
-                false,     // mfaRequired
-                null,      // expiresIn
+                null,
+                false,
+                null,
                 u.getId(),
-                null,      // refreshToken
+                null,
                 u.getRole().name(),
                 u.getUsername()
         );
@@ -106,8 +104,6 @@ public class AuthController {
         final String result = authService.verifyEmail(token);
         return ResponseEntity.ok(result);
     }
-
-    // removed /refresh endpoint (sessions don't need it)
 
     @PostMapping("/password-reset/request")
     public ResponseEntity<Void> requestPasswordReset(@RequestBody @Valid final PasswordResetRequest req) {

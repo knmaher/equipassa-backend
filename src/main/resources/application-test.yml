@@ -81,3 +81,10 @@ equipassa:
   email:
     from-address: "no-reply@test.equipassa.com"
   server: http://localhost
+
+security:
+  remember-me:
+    enabled: false
+kube:
+  probe:
+    token: ${KUBE_PROBE_TOKEN:dev-probe-token}

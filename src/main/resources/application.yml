@@ -9,6 +9,11 @@ spring:
       maximum-pool-size: 15
       minimum-idle: 5
 
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: always
+
   jpa:
     hibernate:
       ddl-auto: validate
@@ -27,15 +32,6 @@ spring:
     baseline-on-migrate: true
     validate-on-migrate: true
 
-  security:
-    user:
-      name: admin
-      password: securepassword
-    oauth2:
-      client:
-        registration: { }
-    filter:
-      order: 0
   mail:
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}
@@ -79,7 +75,8 @@ logging:
   level:
     org:
       springframework:
-        security: INFO
+        security: DEBUG
+        session: DEBUG
         web: INFO
       hibernate: INFO
     com:
@@ -105,3 +102,7 @@ equipassa:
   email:
     from-address: "no-replay@equipassa.com"
   server: ${EQUIPASSA_SERVER:http://localhost:8081}
+
+security:
+  remember-me:
+    enabled: false

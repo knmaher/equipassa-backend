@@ -2,20 +2,34 @@ package com.equipassa.equipassa.controller;
 
 import com.equipassa.equipassa.dto.UserRequest;
 import com.equipassa.equipassa.dto.UserResponse;
+import com.equipassa.equipassa.security.CustomUserDetails;
 import com.equipassa.equipassa.security.dto.*;
 import com.equipassa.equipassa.security.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
-    private final AuthService authService;
 
-    public AuthController(final AuthService authService) {
+    private final AuthService authService;
+    private final AuthenticationManager authenticationManager;
+    private final SecurityContextRepository contextRepository;
+
+    public AuthController(final AuthService authService,
+                          final AuthenticationManager authenticationManager, final SecurityContextRepository contextRepository) {
         this.authService = authService;
+        this.authenticationManager = authenticationManager;
+        this.contextRepository = contextRepository;
     }
 
     @PostMapping("/register-org")
@@ -33,16 +47,56 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody @Valid final LoginRequest request, final HttpServletRequest httpRequest) {
+    public ResponseEntity<AuthResponse> login(
+            @RequestBody @Valid final LoginRequest request,
+            final HttpServletRequest httpRequest,
+            final HttpServletResponse httpResponse
+    ) {
         final String clientIp = getClientIp(httpRequest);
-        return ResponseEntity.ok(authService.login(request, clientIp));
+
+        httpRequest.getSession(true);
+        httpRequest.changeSessionId();
+
+        final Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.email(), request.password())
+        );
+
+        final var context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(authentication);
+        SecurityContextHolder.setContext(context);
+
+        contextRepository.saveContext(context, httpRequest, httpResponse);
+
+        authService.auditLoginSuccess(request.email(), clientIp);
+
+        final CustomUserDetails u = (CustomUserDetails) authentication.getPrincipal();
+        final AuthResponse body = new AuthResponse(
+                null,
+                false,
+                null,
+                u.getId(),
+                null,
+                u.getRole().name(),
+                u.getUsername()
+        );
+        return ResponseEntity.ok(body);
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestHeader("Authorization") final String authHeader) {
-        final String token = authHeader.substring(7);
-        authService.logout(token);
+    public ResponseEntity<Void> logout(final HttpServletRequest request) {
+        SecurityContextHolder.clearContext();
+        final HttpSession session = request.getSession(false);
+        if (session != null) session.invalidate();
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> me() {
+        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof final CustomUserDetails u)) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(new UserResponse(u.getId(), u.getUsername(), u.getRole()));
     }
 
     @GetMapping("/verify-email")
@@ -51,26 +105,14 @@ public class AuthController {
         return ResponseEntity.ok(result);
     }
 
-    @PostMapping("/refresh")
-    public ResponseEntity<AuthResponse> refreshToken(
-            @RequestBody @Valid final RefreshTokenRequest request
-    ) {
-        final AuthResponse response = authService.refreshToken(request.refreshToken());
-        return ResponseEntity.ok(response);
-    }
-
     @PostMapping("/password-reset/request")
-    public ResponseEntity<Void> requestPasswordReset(
-            @RequestBody @Valid final PasswordResetRequest req
-    ) {
+    public ResponseEntity<Void> requestPasswordReset(@RequestBody @Valid final PasswordResetRequest req) {
         authService.requestPasswordReset(req.email());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/password-reset/confirm")
-    public ResponseEntity<Void> confirmPasswordReset(
-            @RequestBody @Valid final PasswordResetConfirmRequest req
-    ) {
+    public ResponseEntity<Void> confirmPasswordReset(@RequestBody @Valid final PasswordResetConfirmRequest req) {
         authService.confirmPasswordReset(req.token(), req.newPassword());
         return ResponseEntity.noContent().build();
     }
